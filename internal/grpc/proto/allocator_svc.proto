@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package rangeallocator.v1;
+
+option go_package = "./pkg/pb";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service RangeAllocator {
+  rpc AllocateRange(AllocateRangeRequest) returns (AllocateRangeResponse) {}
+
+  rpc GetRange(GetRangeRequest) returns (Range) {}
+
+  rpc ListRanges(ListRangesRequest) returns (ListRangesResponse) {}
+
+  rpc UpdateRangeStatus(UpdateRangeStatusRequest) returns (Range) {}
+
+  rpc GetHealth(google.protobuf.Empty) returns (HealthResponse) {}
+}
+
+message Range {
+  string range_id = 1;
+  int64 start_id = 2;
+  int64 end_id = 3;
+  string service_id = 4;
+  string region = 5;
+  RangeStatus status = 6;
+  google.protobuf.Timestamp allocated_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message AllocateRangeRequest {
+  string service_id = 1;
+  optional int64 size = 2;
+  optional string region = 3;
+}
+
+message AllocateRangeResponse { Range range = 1; }
+
+message GetRangeRequest { string range_id = 1; }
+
+message ListRangesRequest {
+  string service_id = 1;
+  optional RangeStatus status = 2;
+  optional string region = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListRangesResponse {
+  repeated Range ranges = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message UpdateRangeStatusRequest {
+  string range_id = 1;
+  RangeStatus status = 2;
+  string service_id = 3;
+}
+
+message HealthResponse {
+  ServiceStatus status = 1;
+  string details = 2;
+}
+
+enum RangeStatus {
+  RANGE_STATUS_UNSPECIFIED = 0;
+  RANGE_STATUS_ACTIVE = 1;
+  RANGE_STATUS_EXHAUSTED = 2;
+  RANGE_STATUS_RELEASED = 3;
+}
+
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_SERVING = 1;
+  SERVICE_STATUS_NOT_SERVING = 2;
+  SERVICE_STATUS_MAINTENANCE = 3;
+}

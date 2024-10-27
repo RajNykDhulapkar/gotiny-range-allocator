@@ -1,0 +1,23 @@
+# Individual test commands
+
+# Health check
+grpcurl -plaintext localhost:50051 rangeallocator.v1.RangeAllocator/GetHealth
+
+# Allocate range
+grpcurl -plaintext -d '{"service_id": "test-service-1"}' \
+    localhost:50051 rangeallocator.v1.RangeAllocator/AllocateRange
+
+# Get range
+grpcurl -plaintext -d '{"range_id": "mock-range-123"}' \
+    localhost:50051 rangeallocator.v1.RangeAllocator/GetRange
+
+# List ranges
+grpcurl -plaintext -d '{"service_id": "test-service-1", "page_size": 10}' \
+    localhost:50051 rangeallocator.v1.RangeAllocator/ListRanges
+
+# Update range status
+grpcurl -plaintext -d '{
+    "range_id": "mock-range-123",
+    "service_id": "test-service-1",
+    "status": "RANGE_STATUS_EXHAUSTED"
+}' localhost:50051 rangeallocator.v1.RangeAllocator/UpdateRangeStatus
