@@ -1,0 +1,26 @@
+# Ignore PostgreSQL data directory
+db_data/
+
+# Ignore compiled binaries
+/bin/
+
+# Ignore Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Ignore IDE/editor specific files
+.vscode/
+.idea/
+*.swp
+
+# Ignore log files
+*.log
+
+# Ignore temporary files
+*.tmp
+*.temp

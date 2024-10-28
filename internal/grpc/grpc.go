@@ -1,25 +1,28 @@
-// internal/adapters/grpc_handler.go
-
 package adapters
 
 import (
 	"context"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/service"
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/db"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/pb"
+	"github.com/google/uuid"
 )
 
 type grpcAdapter struct {
 	pb.UnimplementedRangeAllocatorServer
+	rangeAllocator *service.RangeAllocator
 }
 
-func NewGRPCAdapter() pb.RangeAllocatorServer {
-	return &grpcAdapter{}
+func NewGRPCAdapter(allocator *service.RangeAllocator) pb.RangeAllocatorServer {
+	return &grpcAdapter{
+		rangeAllocator: allocator,
+	}
 }
 
 func (h *grpcAdapter) AllocateRange(ctx context.Context, req *pb.AllocateRangeRequest) (*pb.AllocateRangeResponse, error) {
@@ -27,21 +30,22 @@ func (h *grpcAdapter) AllocateRange(ctx context.Context, req *pb.AllocateRangeRe
 		return nil, status.Error(codes.InvalidArgument, "service_id is required")
 	}
 
-	// Mock response with fake range
-	now := time.Now()
-	mockRange := &pb.Range{
-		RangeId:     "mock-range-123",
-		StartId:     1000,
-		EndId:       2000,
-		ServiceId:   req.ServiceId,
-		Region:      "us-west-1",
-		Status:      pb.RangeStatus_RANGE_STATUS_ACTIVE,
-		AllocatedAt: timestamppb.New(now),
-		UpdatedAt:   timestamppb.New(now),
+	params := service.AllocateRangeParams{
+		ServiceID: req.ServiceId,
+		Size:      req.Size,
+	}
+
+	if req.Region != "" {
+		params.Region = &req.Region
+	}
+
+	rng, err := h.rangeAllocator.AllocateRange(ctx, params)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 	}
 
 	return &pb.AllocateRangeResponse{
-		Range: mockRange,
+		Range: convertRangeToProto(rng),
 	}, nil
 }
 
@@ -50,18 +54,17 @@ func (h *grpcAdapter) GetRange(ctx context.Context, req *pb.GetRangeRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, "range_id is required")
 	}
 
-	// Mock response
-	now := time.Now()
-	return &pb.Range{
-		RangeId:     req.RangeId,
-		StartId:     1000,
-		EndId:       2000,
-		ServiceId:   "mock-service",
-		Region:      "us-west-1",
-		Status:      pb.RangeStatus_RANGE_STATUS_ACTIVE,
-		AllocatedAt: timestamppb.New(now.Add(-24 * time.Hour)), // Allocated yesterday
-		UpdatedAt:   timestamppb.New(now),
-	}, nil
+	rangeID, err := uuid.Parse(req.RangeId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid range_id format: %v", err)
+	}
+
+	rng, err := h.rangeAllocator.GetRange(ctx, rangeID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get range: %v", err)
+	}
+
+	return convertRangeToProto(rng), nil
 }
 
 func (h *grpcAdapter) ListRanges(ctx context.Context, req *pb.ListRangesRequest) (*pb.ListRangesResponse, error) {
@@ -69,35 +72,38 @@ func (h *grpcAdapter) ListRanges(ctx context.Context, req *pb.ListRangesRequest)
 		return nil, status.Error(codes.InvalidArgument, "service_id is required")
 	}
 
-	// Mock response with multiple ranges
-	now := time.Now()
-	mockRanges := []*pb.Range{
-		{
-			RangeId:     "mock-range-1",
-			StartId:     1000,
-			EndId:       2000,
-			ServiceId:   req.ServiceId,
-			Region:      "us-west-1",
-			Status:      pb.RangeStatus_RANGE_STATUS_ACTIVE,
-			AllocatedAt: timestamppb.New(now.Add(-24 * time.Hour)),
-			UpdatedAt:   timestamppb.New(now),
-		},
-		{
-			RangeId:     "mock-range-2",
-			StartId:     2001,
-			EndId:       3000,
-			ServiceId:   req.ServiceId,
-			Region:      "us-west-1",
-			Status:      pb.RangeStatus_RANGE_STATUS_EXHAUSTED,
-			AllocatedAt: timestamppb.New(now.Add(-48 * time.Hour)),
-			UpdatedAt:   timestamppb.New(now.Add(-1 * time.Hour)),
-		},
+	params := service.ListRangesParams{
+		ServiceID: req.ServiceId,
+		PageSize:  req.PageSize,
+	}
+
+	if req.Status != pb.RangeStatus_RANGE_STATUS_UNSPECIFIED {
+		status := req.Status.String()
+		params.Status = &status
+	}
+
+	if req.Region != "" {
+		params.Region = &req.Region
+	}
+
+	if req.PageToken != "" {
+		params.PageToken = &req.PageToken
+	}
+
+	result, err := h.rangeAllocator.ListRanges(ctx, params)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list ranges: %v", err)
+	}
+
+	ranges := make([]*pb.Range, len(result.Ranges))
+	for i, r := range result.Ranges {
+		ranges[i] = convertRangeToProto(&r)
 	}
 
 	return &pb.ListRangesResponse{
-		Ranges:        mockRanges,
-		NextPageToken: "", // No more pages
-		TotalCount:    2,
+		Ranges:        ranges,
+		NextPageToken: result.NextPageToken,
+		TotalCount:    int32(result.TotalCount),
 	}, nil
 }
 
@@ -109,24 +115,60 @@ func (h *grpcAdapter) UpdateRangeStatus(ctx context.Context, req *pb.UpdateRange
 		return nil, status.Error(codes.InvalidArgument, "service_id is required")
 	}
 
-	// Mock updated range
-	now := time.Now()
-	return &pb.Range{
-		RangeId:     req.RangeId,
-		StartId:     1000,
-		EndId:       2000,
-		ServiceId:   req.ServiceId,
-		Region:      "us-west-1",
-		Status:      req.Status,
-		AllocatedAt: timestamppb.New(now.Add(-24 * time.Hour)),
-		UpdatedAt:   timestamppb.New(now),
-	}, nil
+	rangeID, err := uuid.Parse(req.RangeId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid range_id format: %v", err)
+	}
+
+	params := service.UpdateRangeStatusParams{
+		RangeID:   rangeID,
+		ServiceID: req.ServiceId,
+		Status:    req.Status.String(),
+	}
+
+	rng, err := h.rangeAllocator.UpdateRangeStatus(ctx, params)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update range status: %v", err)
+	}
+
+	return convertRangeToProto(rng), nil
 }
 
 func (h *grpcAdapter) GetHealth(ctx context.Context, _ *emptypb.Empty) (*pb.HealthResponse, error) {
-	// Mock healthy response
+	isHealthy, details := h.rangeAllocator.GetHealth(ctx)
+
+	status := pb.ServiceStatus_SERVICE_STATUS_NOT_SERVING
+	if isHealthy {
+		status = pb.ServiceStatus_SERVICE_STATUS_SERVING
+	}
+
 	return &pb.HealthResponse{
-		Status:  pb.ServiceStatus_SERVICE_STATUS_SERVING,
-		Details: "Mock service is healthy",
+		Status:  status,
+		Details: details,
 	}, nil
+}
+
+func convertRangeToProto(r *db.Range) *pb.Range {
+	var status pb.RangeStatus
+	switch r.Status {
+	case "ACTIVE":
+		status = pb.RangeStatus_RANGE_STATUS_ACTIVE
+	case "EXHAUSTED":
+		status = pb.RangeStatus_RANGE_STATUS_EXHAUSTED
+	case "RELEASED":
+		status = pb.RangeStatus_RANGE_STATUS_RELEASED
+	default:
+		status = pb.RangeStatus_RANGE_STATUS_UNSPECIFIED
+	}
+
+	return &pb.Range{
+		RangeId:     r.RangeID.String(),
+		StartId:     r.StartID,
+		EndId:       r.EndID,
+		ServiceId:   r.ServiceID,
+		Region:      r.Region,
+		Status:      status,
+		AllocatedAt: timestamppb.New(r.AllocatedAt),
+		UpdatedAt:   timestamppb.New(r.UpdatedAt),
+	}
 }

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -14,10 +15,28 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	adapters "github.com/RajNykDhulapkar/gotiny-range-allocator/internal/grpc"
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/repository"
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/service"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/pb"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
+	ctx := context.Background()
+
+	// Initialize database connection
+	dbpool, err := pgxpool.New(ctx, os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("Unable to connect to database: %v", err)
+	}
+	defer dbpool.Close()
+
+	// Initialize repository
+	repo := repository.New(dbpool)
+
+	// Initialize range allocator service
+	rangeAllocator := service.NewRangeAllocator(repo)
+
 	// Get port from environment or use default
 	port := os.Getenv("GRPC_PORT")
 	if port == "" {
@@ -30,20 +49,20 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	// Create gRPC server
-	server := grpc.NewServer()
+	// Initialize gRPC server
+	grpcServer := grpc.NewServer()
 
-	// Register handlers
-	handler := adapters.NewGRPCAdapter()
-	pb.RegisterRangeAllocatorServer(server, handler)
+	// Initialize and register gRPC handler
+	handler := adapters.NewGRPCAdapter(rangeAllocator)
+	pb.RegisterRangeAllocatorServer(grpcServer, handler)
 
 	// Register reflection service for grpcurl
-	reflection.Register(server)
+	reflection.Register(grpcServer)
 
 	// Start server in a goroutine
 	go func() {
 		log.Printf("Starting gRPC server on port %s", port)
-		if err := server.Serve(lis); err != nil {
+		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
@@ -55,6 +74,6 @@ func main() {
 
 	// Graceful shutdown
 	log.Println("Shutting down gRPC server...")
-	server.GracefulStop()
+	grpcServer.GracefulStop()
 	log.Println("Server stopped")
 }
