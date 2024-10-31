@@ -19,9 +19,15 @@ import (
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/service"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/pb"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file")
+	}
+
 	ctx := context.Background()
 
 	// Initialize database connection

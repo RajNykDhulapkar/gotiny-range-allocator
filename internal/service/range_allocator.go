@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/repository"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/db"
 	"github.com/google/uuid"
@@ -54,10 +56,15 @@ func (s *RangeAllocator) AllocateRange(ctx context.Context, params AllocateRange
 		return nil, fmt.Errorf("service_id is required")
 	}
 
+	pgRegion := pgtype.Text{
+		String: region,
+		Valid:  true, // Mark it as a valid non-null value
+	}
+
 	// Create range allocation request
 	createParams := db.CreateRangeParams{
 		ServiceID: params.ServiceID,
-		Region:    region,
+		Region:    pgRegion,
 		Status:    "ACTIVE",
 	}
 

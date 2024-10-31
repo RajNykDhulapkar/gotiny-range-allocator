@@ -24,3 +24,6 @@ db_data/
 # Ignore temporary files
 *.tmp
 *.temp
+
+# Environmental variables
+.env
