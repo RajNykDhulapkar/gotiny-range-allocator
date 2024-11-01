@@ -3,18 +3,15 @@ package adapters
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/service"
-	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/db"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/pb"
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/util"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type grpcAdapter struct {
@@ -47,7 +44,7 @@ func (h *grpcAdapter) AllocateRange(ctx context.Context, req *pb.AllocateRangeRe
 		return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 	}
 
-	searializedRange, err := convertRangeToProto(rng)
+	searializedRange, err := util.ConvertRangeToProto(rng)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 	}
@@ -72,7 +69,7 @@ func (h *grpcAdapter) GetRange(ctx context.Context, req *pb.GetRangeRequest) (*p
 		return nil, status.Errorf(codes.Internal, "failed to get range: %v", err)
 	}
 
-	searializedRange, err := convertRangeToProto(rng)
+	searializedRange, err := util.ConvertRangeToProto(rng)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 	}
@@ -86,13 +83,16 @@ func (h *grpcAdapter) ListRanges(ctx context.Context, req *pb.ListRangesRequest)
 	}
 
 	params := service.ListRangesParams{
-		ServiceID: req.ServiceId,
 		PageSize:  req.PageSize,
+		ServiceID: req.ServiceId,
 	}
 
-	if req.Status != nil && *req.Status != pb.RangeStatus_RANGE_STATUS_UNSPECIFIED {
-		status := req.Status.String()
-		params.Status = &status
+	if req.Status != nil {
+		rangeStatus, err := util.ConvertPBToDBRangeStatus(req.Status)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "invalid RangeStatus value: %v", err)
+		}
+		params.Status = &rangeStatus
 	}
 
 	if req.Region != nil && *req.Region != "" {
@@ -110,7 +110,7 @@ func (h *grpcAdapter) ListRanges(ctx context.Context, req *pb.ListRangesRequest)
 
 	ranges := make([]*pb.Range, len(result.Ranges))
 	for i, r := range result.Ranges {
-		searializedRange, err := convertRangeToProto(r)
+		searializedRange, err := util.ConvertRangeToProto(r)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 		}
@@ -137,10 +137,15 @@ func (h *grpcAdapter) UpdateRangeStatus(ctx context.Context, req *pb.UpdateRange
 		return nil, status.Errorf(codes.InvalidArgument, "invalid range_id format: %v", err)
 	}
 
+	rangeStatus, err := util.ConvertPBToDBRangeStatus(&req.Status)
+	if err != nil {
+		return nil, fmt.Errorf("invalid RangeStatus value: %v", err)
+	}
+
 	params := service.UpdateRangeStatusParams{
 		RangeID:   rangeID,
 		ServiceID: req.ServiceId,
-		Status:    req.Status.String(),
+		Status:    rangeStatus,
 	}
 
 	rng, err := h.rangeAllocator.UpdateRangeStatus(ctx, params)
@@ -148,7 +153,7 @@ func (h *grpcAdapter) UpdateRangeStatus(ctx context.Context, req *pb.UpdateRange
 		return nil, status.Errorf(codes.Internal, "failed to update range status: %v", err)
 	}
 
-	searializedRange, err := convertRangeToProto(rng)
+	searializedRange, err := util.ConvertRangeToProto(rng)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
 	}
@@ -167,59 +172,5 @@ func (h *grpcAdapter) GetHealth(ctx context.Context, _ *emptypb.Empty) (*pb.Heal
 	return &pb.HealthResponse{
 		Status:  status,
 		Details: details,
-	}, nil
-}
-
-func toString(text pgtype.Text) (string, error) {
-	if text.Valid {
-		return text.String, nil
-	}
-	return "", fmt.Errorf("text is null or invalid")
-}
-
-func toTime(tz pgtype.Timestamptz) (time.Time, error) {
-	if tz.Valid {
-		return tz.Time, nil
-	}
-	return time.Time{}, fmt.Errorf("timestamp is null")
-}
-
-func convertRangeToProto(r *db.Range) (*pb.Range, error) {
-	var status pb.RangeStatus
-	switch r.Status {
-	case "ACTIVE":
-		status = pb.RangeStatus_RANGE_STATUS_ACTIVE
-	case "EXHAUSTED":
-		status = pb.RangeStatus_RANGE_STATUS_EXHAUSTED
-	case "RELEASED":
-		status = pb.RangeStatus_RANGE_STATUS_RELEASED
-	default:
-		status = pb.RangeStatus_RANGE_STATUS_UNSPECIFIED
-	}
-
-	region, err := toString(r.Region)
-	if err != nil {
-		return nil, fmt.Errorf("invalid Region value: %v", err)
-	}
-
-	allocatedAt, err := toTime(r.AllocatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("invalid AllocatedAt value: %v", err)
-	}
-
-	updatedAt, err := toTime(r.UpdatedAt)
-	if err != nil {
-		return nil, fmt.Errorf("invalid UpdatedAt value: %v", err)
-	}
-
-	return &pb.Range{
-		RangeId:     r.RangeID.String(),
-		StartId:     r.StartID,
-		EndId:       r.EndID,
-		ServiceId:   r.ServiceID,
-		Region:      region,
-		Status:      status,
-		AllocatedAt: timestamppb.New(allocatedAt),
-		UpdatedAt:   timestamppb.New(updatedAt),
 	}, nil
 }

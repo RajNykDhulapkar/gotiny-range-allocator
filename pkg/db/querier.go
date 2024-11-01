@@ -12,7 +12,7 @@ import (
 
 type Querier interface {
 	// Counts total ranges for a service
-	CountRanges(ctx context.Context, serviceID string) (int64, error)
+	CountRanges(ctx context.Context, arg CountRangesParams) (int64, error)
 	// Creates a new range allocation for a service
 	CreateRange(ctx context.Context, arg CreateRangeParams) (*Range, error)
 	// Deletes a range (for testing purposes)

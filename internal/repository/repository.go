@@ -94,7 +94,9 @@ func (r *Repository) UpdateRangeStatus(ctx context.Context, params db.UpdateRang
 }
 
 func (r *Repository) CountRanges(ctx context.Context, serviceID string) (int64, error) {
-	count, err := r.queries.CountRanges(ctx, serviceID)
+	count, err := r.queries.CountRanges(ctx, db.CountRangesParams{
+		ServiceID: serviceID,
+	})
 	if err != nil {
 		return 0, fmt.Errorf("count ranges: %w", err)
 	}

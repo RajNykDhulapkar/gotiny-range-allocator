@@ -5,17 +5,64 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type RangeStatus string
+
+const (
+	RangeStatusUNSPECIFIED RangeStatus = "UNSPECIFIED"
+	RangeStatusACTIVE      RangeStatus = "ACTIVE"
+	RangeStatusEXHAUSTED   RangeStatus = "EXHAUSTED"
+	RangeStatusRELEASED    RangeStatus = "RELEASED"
+)
+
+func (e *RangeStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = RangeStatus(s)
+	case string:
+		*e = RangeStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for RangeStatus: %T", src)
+	}
+	return nil
+}
+
+type NullRangeStatus struct {
+	RangeStatus RangeStatus `json:"range_status"`
+	Valid       bool        `json:"valid"` // Valid is true if RangeStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRangeStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.RangeStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.RangeStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRangeStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.RangeStatus), nil
+}
+
 type Range struct {
+	RangeID     uuid.UUID          `json:"range_id"`
 	StartID     int64              `json:"start_id"`
 	EndID       int64              `json:"end_id"`
+	ServiceID   string             `json:"service_id"`
+	Region      pgtype.Text        `json:"region"`
+	Status      RangeStatus        `json:"status"`
 	AllocatedAt pgtype.Timestamptz `json:"allocated_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	RangeID     uuid.UUID          `json:"range_id"`
-	Region      pgtype.Text        `json:"region"`
-	ServiceID   string             `json:"service_id"`
-	Status      string             `json:"status"`
 }

@@ -13,13 +13,22 @@ import (
 )
 
 const countRanges = `-- name: CountRanges :one
-SELECT COUNT(*) FROM ranges
+SELECT COUNT(*) 
+FROM ranges 
 WHERE service_id = $1
+    AND ($2::range_status IS NULL OR status = $2::range_status)
+    AND ($3::text IS NULL OR region = $3)
 `
 
+type CountRangesParams struct {
+	ServiceID    string          `json:"service_id"`
+	StatusFilter NullRangeStatus `json:"status_filter"`
+	RegionFilter pgtype.Text     `json:"region_filter"`
+}
+
 // Counts total ranges for a service
-func (q *Queries) CountRanges(ctx context.Context, serviceID string) (int64, error) {
-	row := q.db.QueryRow(ctx, countRanges, serviceID)
+func (q *Queries) CountRanges(ctx context.Context, arg CountRangesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countRanges, arg.ServiceID, arg.StatusFilter, arg.RegionFilter)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -43,7 +52,7 @@ type CreateRangeParams struct {
 	EndID     int64       `json:"end_id"`
 	ServiceID string      `json:"service_id"`
 	Region    pgtype.Text `json:"region"`
-	Status    string      `json:"status"`
+	Status    RangeStatus `json:"status"`
 }
 
 // Creates a new range allocation for a service
@@ -146,9 +155,9 @@ LIMIT $2 OFFSET $3
 `
 
 type GetRangesByStatusParams struct {
-	Status string `json:"status"`
-	Limit  int32  `json:"limit"`
-	Offset int32  `json:"offset"`
+	Status RangeStatus `json:"status"`
+	Limit  int32       `json:"limit"`
+	Offset int32       `json:"offset"`
 }
 
 // Gets ranges by status
@@ -226,19 +235,19 @@ func (q *Queries) GetServiceRanges(ctx context.Context, arg GetServiceRangesPara
 const listRanges = `-- name: ListRanges :many
 SELECT range_id, start_id, end_id, service_id, region, status, allocated_at, updated_at FROM ranges
 WHERE service_id = $1
-    AND (NULLIF($3, '')::VARCHAR IS NULL OR status = $3::VARCHAR)
-    AND (NULLIF($4, '')::VARCHAR IS NULL OR region = $4::VARCHAR)
-    AND (NULLIF($5, '')::UUID IS NULL OR range_id > $5::UUID)
+    AND ($3::range_status IS NULL OR status = $3::range_status)
+    AND ($4::text IS NULL OR region = $4)
+    AND ($5::uuid IS NULL OR range_id > $5)
 ORDER BY range_id
 LIMIT $2
 `
 
 type ListRangesParams struct {
-	ServiceID    string      `json:"service_id"`
-	Limit        int32       `json:"limit"`
-	StatusFilter interface{} `json:"status_filter"`
-	RegionFilter interface{} `json:"region_filter"`
-	CursorID     interface{} `json:"cursor_id"`
+	ServiceID    string          `json:"service_id"`
+	Limit        int32           `json:"limit"`
+	StatusFilter NullRangeStatus `json:"status_filter"`
+	RegionFilter pgtype.Text     `json:"region_filter"`
+	CursorID     pgtype.UUID     `json:"cursor_id"`
 }
 
 // Lists ranges for a service with optional filters
@@ -286,9 +295,9 @@ RETURNING range_id, start_id, end_id, service_id, region, status, allocated_at, 
 `
 
 type UpdateRangeStatusParams struct {
-	RangeID   uuid.UUID `json:"range_id"`
-	ServiceID string    `json:"service_id"`
-	Status    string    `json:"status"`
+	RangeID   uuid.UUID   `json:"range_id"`
+	ServiceID string      `json:"service_id"`
+	Status    RangeStatus `json:"status"`
 }
 
 // Updates the status of a range

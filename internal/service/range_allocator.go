@@ -79,7 +79,7 @@ func (s *RangeAllocator) GetRange(ctx context.Context, rangeID uuid.UUID) (*db.R
 // ListRangesParams contains parameters for listing ranges
 type ListRangesParams struct {
 	ServiceID string
-	Status    *string
+	Status    *db.RangeStatus
 	Region    *string
 	PageSize  int32
 	PageToken *string
@@ -98,24 +98,28 @@ func (s *RangeAllocator) ListRanges(ctx context.Context, params ListRangesParams
 		return nil, fmt.Errorf("service_id is required")
 	}
 
-	if params.PageSize <= 0 {
-		params.PageSize = 50 // default page size
+	pageSize := params.PageSize
+	if pageSize <= 0 {
+		pageSize = 50 // default page size
 	}
 
 	listParams := db.ListRangesParams{
-		ServiceID:    params.ServiceID,
-		StatusFilter: "",
-		RegionFilter: "",
-		CursorID:     uuid.Nil,
-		Limit:        params.PageSize + 1, // fetch one extra to determine if there are more pages
+		ServiceID: params.ServiceID,
+		Limit:     params.PageSize + 1, // fetch one extra to determine if there are more pages
 	}
 
 	if params.Status != nil {
-		listParams.StatusFilter = *params.Status
+		listParams.StatusFilter = db.NullRangeStatus{
+			Valid:       true,
+			RangeStatus: *params.Status,
+		}
 	}
 
 	if params.Region != nil {
-		listParams.RegionFilter = *params.Region
+		listParams.RegionFilter = pgtype.Text{
+			String: *params.Region,
+			Valid:  true,
+		}
 	}
 
 	if params.PageToken != nil && *params.PageToken != "" {
@@ -123,7 +127,10 @@ func (s *RangeAllocator) ListRanges(ctx context.Context, params ListRangesParams
 		if err != nil {
 			return nil, fmt.Errorf("invalid page token: %w", err)
 		}
-		listParams.CursorID = cursorID
+		listParams.CursorID = pgtype.UUID{
+			Bytes: cursorID,
+			Valid: true,
+		}
 	}
 
 	ranges, err := s.repo.ListRanges(ctx, listParams)
@@ -153,7 +160,7 @@ func (s *RangeAllocator) ListRanges(ctx context.Context, params ListRangesParams
 type UpdateRangeStatusParams struct {
 	RangeID   uuid.UUID
 	ServiceID string
-	Status    string
+	Status    db.RangeStatus
 }
 
 // UpdateRangeStatus updates the status of a range
