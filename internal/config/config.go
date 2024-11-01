@@ -74,10 +74,10 @@ func ValidateConfig(cfg *Config) error {
 	}
 
 	if cfg.GRPCPort == "" {
-		return fmt.Errorf("GRPC_PORT is required")
+		return fmt.Errorf("RANGE_ALLOCATOR_GRPC_PORT is required")
 	}
 	if cfg.DatabaseURL == "" {
-		return fmt.Errorf("DATABASE_URL is required")
+		return fmt.Errorf("RANGE_ALLOCATOR_DATABASE_URL is required")
 	}
 	if cfg.Range.DefaultSize <= 0 {
 		return fmt.Errorf("range_default_size must be positive")

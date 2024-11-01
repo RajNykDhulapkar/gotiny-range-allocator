@@ -1,4 +1,9 @@
+#!/bin/sh
+
+docker network create range-allocator-network
+
 docker run --name postgres \
+  --network range-allocator-network \
   -e POSTGRES_USER=username \
   -e POSTGRES_PASSWORD=password \
   -e POSTGRES_DB=alloc \

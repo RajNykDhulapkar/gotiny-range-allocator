@@ -1,0 +1,78 @@
+# Environment and secrets
+.env
+.env.*
+*.env
+secrets/
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+bin/
+dist/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+range-allocator
+
+# Test files
+*_test.go
+testdata/
+coverage.txt
+*.test
+*.out
+
+# Documentation
+*.md
+docs/
+README*
+CHANGELOG*
+LICENSE*
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose*
+*.dockerfile
+
+# Development tools and configs
+.golangci.yml
+.air.toml
+.editorconfig
+Makefile
+*.mk
+
+# Dependency directories
+vendor/
+node_modules/
+db_data/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

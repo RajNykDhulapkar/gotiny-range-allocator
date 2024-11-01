@@ -21,3 +21,21 @@ grpcurl -plaintext -d '{
     "service_id": "test-service-1",
     "status": "RANGE_STATUS_EXHAUSTED"
 }' localhost:50051 rangeallocator.v1.RangeAllocator/UpdateRangeStatus
+
+
+
+# spin up docker instance
+docker run -d \                         ✔ 
+  --name range-allocator \
+  --network range-allocator-network \
+  -p 50051:50051 \
+  -e RANGE_ALLOCATOR_DATABASE_URL="postgres://username:password@postgres:5432/alloc?sslmode=disable" \
+  -e RANGE_ALLOCATOR_GRPC_PORT=50051 \
+  -e RANGE_ALLOCATOR_RANGE_DEFAULT_SIZE=1000 \
+  -e RANGE_ALLOCATOR_RANGE_MIN_SIZE=100 \
+  -e RANGE_ALLOCATOR_RANGE_MAX_SIZE=10000 \
+  range-allocator
+
+docker exec range-allocator grpcurl -plaintext localhost:${RANGE_ALLOCATOR_GRPC_PORT} rangeallocator.v1.RangeAllocator/GetHealth
+
+docker inspect --format='{{.State.Health.Status}}' range-allocator
