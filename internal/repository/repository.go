@@ -12,7 +12,7 @@ import (
 )
 
 type RepositoryService interface {
-	AllocateRange(ctx context.Context, params db.CreateRangeParams) (*db.Range, error)
+	AllocateRange(ctx context.Context, params db.CreateRangeParams, size int64) (*db.Range, error)
 	GetRange(ctx context.Context, rangeID uuid.UUID) (*db.Range, error)
 	UpdateRangeStatus(ctx context.Context, params db.UpdateRangeStatusParams) (*db.Range, error)
 	CountRanges(ctx context.Context, serviceID string) (int64, error)
@@ -32,7 +32,7 @@ func New(pool *pgxpool.Pool) RepositoryService {
 	}
 }
 
-func (r *Repository) AllocateRange(ctx context.Context, params db.CreateRangeParams) (*db.Range, error) {
+func (r *Repository) AllocateRange(ctx context.Context, params db.CreateRangeParams, size int64) (*db.Range, error) {
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{
 		IsoLevel: pgx.Serializable,
 	})
@@ -49,7 +49,7 @@ func (r *Repository) AllocateRange(ctx context.Context, params db.CreateRangePar
 		Region:    params.Region,
 	})
 
-	startID := int64(1) // Default start for new service
+	startID := int64(1) // Default start
 	if err == nil {
 		startID = lastRange.EndID + 1
 	} else if err != pgx.ErrNoRows {
@@ -58,7 +58,7 @@ func (r *Repository) AllocateRange(ctx context.Context, params db.CreateRangePar
 
 	// Create new range
 	params.StartID = startID
-	params.EndID = startID + 999 // Allocate 1000 IDs by default
+	params.EndID = startID + size
 
 	newRange, err := qtx.CreateRange(ctx, params)
 	if err != nil {

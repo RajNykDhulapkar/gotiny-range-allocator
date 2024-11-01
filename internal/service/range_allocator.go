@@ -6,15 +6,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/config"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/internal/repository"
 	"github.com/RajNykDhulapkar/gotiny-range-allocator/pkg/db"
 	"github.com/google/uuid"
-)
-
-const (
-	defaultRangeSize = int64(1000)
-	maxRangeSize     = int64(10000)
-	minRangeSize     = int64(100)
 )
 
 type RangeAllocatorService interface {
@@ -26,13 +21,15 @@ type RangeAllocatorService interface {
 
 // RangeAllocator implements the core business logic for range allocation
 type RangeAllocator struct {
-	repo repository.RepositoryService
+	repo   repository.RepositoryService
+	config *config.RangeConfig
 }
 
 // NewRangeAllocator creates a new RangeAllocator service
-func NewRangeAllocator(repo repository.RepositoryService) RangeAllocatorService {
+func NewRangeAllocator(repo repository.RepositoryService, cfg *config.RangeConfig) RangeAllocatorService {
 	return &RangeAllocator{
-		repo: repo,
+		repo:   repo,
+		config: cfg,
 	}
 }
 
@@ -46,11 +43,15 @@ type AllocateRangeParams struct {
 // AllocateRange allocates a new range for a service
 func (s *RangeAllocator) AllocateRange(ctx context.Context, params AllocateRangeParams) (*db.Range, error) {
 	// Validate and set defaults
-	size := defaultRangeSize
+	size := s.config.DefaultSize
 	if params.Size != nil {
 		size = *params.Size
-		if size < minRangeSize || size > maxRangeSize {
-			return nil, fmt.Errorf("range size must be between %d and %d", minRangeSize, maxRangeSize)
+		if size < s.config.MinSize || size > s.config.MaxSize {
+			return nil, fmt.Errorf(
+				"range size must be between %d and %d",
+				s.config.MinSize,
+				s.config.MaxSize,
+			)
 		}
 	}
 
@@ -65,17 +66,17 @@ func (s *RangeAllocator) AllocateRange(ctx context.Context, params AllocateRange
 
 	pgRegion := pgtype.Text{
 		String: region,
-		Valid:  true, // Mark it as a valid non-null value
+		Valid:  true,
 	}
 
 	// Create range allocation request
 	createParams := db.CreateRangeParams{
 		ServiceID: params.ServiceID,
 		Region:    pgRegion,
-		Status:    "ACTIVE",
+		Status:    db.RangeStatusACTIVE,
 	}
 
-	return s.repo.AllocateRange(ctx, createParams)
+	return s.repo.AllocateRange(ctx, createParams, size)
 }
 
 // GetRange retrieves a range by ID
