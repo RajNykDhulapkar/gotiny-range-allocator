@@ -11,12 +11,21 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type RepositoryService interface {
+	AllocateRange(ctx context.Context, params db.CreateRangeParams) (*db.Range, error)
+	GetRange(ctx context.Context, rangeID uuid.UUID) (*db.Range, error)
+	UpdateRangeStatus(ctx context.Context, params db.UpdateRangeStatusParams) (*db.Range, error)
+	CountRanges(ctx context.Context, serviceID string) (int64, error)
+	GetRangesByStatus(ctx context.Context, params db.GetRangesByStatusParams) ([]*db.Range, error)
+	GetServiceRanges(ctx context.Context, params db.GetServiceRangesParams) ([]*db.Range, error)
+}
+
 type Repository struct {
 	queries *db.Queries
 	pool    *pgxpool.Pool
 }
 
-func New(pool *pgxpool.Pool) *Repository {
+func New(pool *pgxpool.Pool) RepositoryService {
 	return &Repository{
 		queries: db.New(pool),
 		pool:    pool,

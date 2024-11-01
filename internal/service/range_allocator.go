@@ -17,13 +17,20 @@ const (
 	minRangeSize     = int64(100)
 )
 
+type RangeAllocatorService interface {
+	AllocateRange(ctx context.Context, params AllocateRangeParams) (*db.Range, error)
+	GetRange(ctx context.Context, rangeID uuid.UUID) (*db.Range, error)
+	UpdateRangeStatus(ctx context.Context, params UpdateRangeStatusParams) (*db.Range, error)
+	GetHealth(ctx context.Context) (bool, string)
+}
+
 // RangeAllocator implements the core business logic for range allocation
 type RangeAllocator struct {
-	repo *repository.Repository
+	repo repository.RepositoryService
 }
 
 // NewRangeAllocator creates a new RangeAllocator service
-func NewRangeAllocator(repo *repository.Repository) *RangeAllocator {
+func NewRangeAllocator(repo repository.RepositoryService) RangeAllocatorService {
 	return &RangeAllocator{
 		repo: repo,
 	}

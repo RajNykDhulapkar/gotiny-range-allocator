@@ -16,10 +16,10 @@ import (
 
 type grpcAdapter struct {
 	pb.UnimplementedRangeAllocatorServer
-	rangeAllocator *service.RangeAllocator
+	rangeAllocator service.RangeAllocatorService
 }
 
-func NewGRPCAdapter(allocator *service.RangeAllocator) pb.RangeAllocatorServer {
+func NewGRPCAdapter(allocator service.RangeAllocatorService) pb.RangeAllocatorServer {
 	return &grpcAdapter{
 		rangeAllocator: allocator,
 	}
