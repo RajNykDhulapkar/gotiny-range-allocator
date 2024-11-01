@@ -74,14 +74,6 @@ func (r *Repository) GetRange(ctx context.Context, rangeID uuid.UUID) (*db.Range
 	return rng, nil
 }
 
-func (r *Repository) ListRanges(ctx context.Context, params db.ListRangesParams) ([]*db.Range, error) {
-	ranges, err := r.queries.ListRanges(ctx, params)
-	if err != nil {
-		return nil, fmt.Errorf("list ranges: %w", err)
-	}
-	return ranges, nil
-}
-
 func (r *Repository) UpdateRangeStatus(ctx context.Context, params db.UpdateRangeStatusParams) (*db.Range, error) {
 	rng, err := r.queries.UpdateRangeStatus(ctx, params)
 	if err == pgx.ErrNoRows {

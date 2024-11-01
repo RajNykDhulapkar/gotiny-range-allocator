@@ -232,60 +232,6 @@ func (q *Queries) GetServiceRanges(ctx context.Context, arg GetServiceRangesPara
 	return items, nil
 }
 
-const listRanges = `-- name: ListRanges :many
-SELECT range_id, start_id, end_id, service_id, region, status, allocated_at, updated_at FROM ranges
-WHERE service_id = $1
-    AND ($3::range_status IS NULL OR status = $3::range_status)
-    AND ($4::text IS NULL OR region = $4)
-    AND ($5::uuid IS NULL OR range_id > $5)
-ORDER BY range_id
-LIMIT $2
-`
-
-type ListRangesParams struct {
-	ServiceID    string          `json:"service_id"`
-	Limit        int32           `json:"limit"`
-	StatusFilter NullRangeStatus `json:"status_filter"`
-	RegionFilter pgtype.Text     `json:"region_filter"`
-	CursorID     pgtype.UUID     `json:"cursor_id"`
-}
-
-// Lists ranges for a service with optional filters
-func (q *Queries) ListRanges(ctx context.Context, arg ListRangesParams) ([]*Range, error) {
-	rows, err := q.db.Query(ctx, listRanges,
-		arg.ServiceID,
-		arg.Limit,
-		arg.StatusFilter,
-		arg.RegionFilter,
-		arg.CursorID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []*Range{}
-	for rows.Next() {
-		var i Range
-		if err := rows.Scan(
-			&i.RangeID,
-			&i.StartID,
-			&i.EndID,
-			&i.ServiceID,
-			&i.Region,
-			&i.Status,
-			&i.AllocatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const updateRangeStatus = `-- name: UpdateRangeStatus :one
 UPDATE ranges
 SET status = $3

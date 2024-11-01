@@ -22,7 +22,6 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	RangeAllocator_AllocateRange_FullMethodName     = "/rangeallocator.v1.RangeAllocator/AllocateRange"
 	RangeAllocator_GetRange_FullMethodName          = "/rangeallocator.v1.RangeAllocator/GetRange"
-	RangeAllocator_ListRanges_FullMethodName        = "/rangeallocator.v1.RangeAllocator/ListRanges"
 	RangeAllocator_UpdateRangeStatus_FullMethodName = "/rangeallocator.v1.RangeAllocator/UpdateRangeStatus"
 	RangeAllocator_GetHealth_FullMethodName         = "/rangeallocator.v1.RangeAllocator/GetHealth"
 )
@@ -33,7 +32,6 @@ const (
 type RangeAllocatorClient interface {
 	AllocateRange(ctx context.Context, in *AllocateRangeRequest, opts ...grpc.CallOption) (*AllocateRangeResponse, error)
 	GetRange(ctx context.Context, in *GetRangeRequest, opts ...grpc.CallOption) (*Range, error)
-	ListRanges(ctx context.Context, in *ListRangesRequest, opts ...grpc.CallOption) (*ListRangesResponse, error)
 	UpdateRangeStatus(ctx context.Context, in *UpdateRangeStatusRequest, opts ...grpc.CallOption) (*Range, error)
 	GetHealth(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*HealthResponse, error)
 }
@@ -66,16 +64,6 @@ func (c *rangeAllocatorClient) GetRange(ctx context.Context, in *GetRangeRequest
 	return out, nil
 }
 
-func (c *rangeAllocatorClient) ListRanges(ctx context.Context, in *ListRangesRequest, opts ...grpc.CallOption) (*ListRangesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListRangesResponse)
-	err := c.cc.Invoke(ctx, RangeAllocator_ListRanges_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *rangeAllocatorClient) UpdateRangeStatus(ctx context.Context, in *UpdateRangeStatusRequest, opts ...grpc.CallOption) (*Range, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Range)
@@ -102,7 +90,6 @@ func (c *rangeAllocatorClient) GetHealth(ctx context.Context, in *emptypb.Empty,
 type RangeAllocatorServer interface {
 	AllocateRange(context.Context, *AllocateRangeRequest) (*AllocateRangeResponse, error)
 	GetRange(context.Context, *GetRangeRequest) (*Range, error)
-	ListRanges(context.Context, *ListRangesRequest) (*ListRangesResponse, error)
 	UpdateRangeStatus(context.Context, *UpdateRangeStatusRequest) (*Range, error)
 	GetHealth(context.Context, *emptypb.Empty) (*HealthResponse, error)
 	mustEmbedUnimplementedRangeAllocatorServer()
@@ -120,9 +107,6 @@ func (UnimplementedRangeAllocatorServer) AllocateRange(context.Context, *Allocat
 }
 func (UnimplementedRangeAllocatorServer) GetRange(context.Context, *GetRangeRequest) (*Range, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRange not implemented")
-}
-func (UnimplementedRangeAllocatorServer) ListRanges(context.Context, *ListRangesRequest) (*ListRangesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListRanges not implemented")
 }
 func (UnimplementedRangeAllocatorServer) UpdateRangeStatus(context.Context, *UpdateRangeStatusRequest) (*Range, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateRangeStatus not implemented")
@@ -187,24 +171,6 @@ func _RangeAllocator_GetRange_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _RangeAllocator_ListRanges_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListRangesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RangeAllocatorServer).ListRanges(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RangeAllocator_ListRanges_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RangeAllocatorServer).ListRanges(ctx, req.(*ListRangesRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _RangeAllocator_UpdateRangeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateRangeStatusRequest)
 	if err := dec(in); err != nil {
@@ -255,10 +221,6 @@ var RangeAllocator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRange",
 			Handler:    _RangeAllocator_GetRange_Handler,
-		},
-		{
-			MethodName: "ListRanges",
-			Handler:    _RangeAllocator_ListRanges_Handler,
 		},
 		{
 			MethodName: "UpdateRangeStatus",

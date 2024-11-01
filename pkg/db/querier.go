@@ -25,8 +25,6 @@ type Querier interface {
 	GetRangesByStatus(ctx context.Context, arg GetRangesByStatusParams) ([]*Range, error)
 	// Gets all ranges for a service in a specific region
 	GetServiceRanges(ctx context.Context, arg GetServiceRangesParams) ([]*Range, error)
-	// Lists ranges for a service with optional filters
-	ListRanges(ctx context.Context, arg ListRangesParams) ([]*Range, error)
 	// Updates the status of a range
 	UpdateRangeStatus(ctx context.Context, arg UpdateRangeStatusParams) (*Range, error)
 }

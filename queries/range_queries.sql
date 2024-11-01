@@ -24,16 +24,6 @@ AND region = $2
 ORDER BY end_id DESC
 LIMIT 1;
 
--- name: ListRanges :many
--- Lists ranges for a service with optional filters
-SELECT * FROM ranges
-WHERE service_id = $1
-    AND (sqlc.narg('status_filter')::range_status IS NULL OR status = sqlc.narg('status_filter')::range_status)
-    AND (sqlc.narg('region_filter')::text IS NULL OR region = sqlc.narg('region_filter'))
-    AND (sqlc.narg('cursor_id')::uuid IS NULL OR range_id > sqlc.narg('cursor_id'))
-ORDER BY range_id
-LIMIT $2;
-
 -- name: CountRanges :one
 -- Counts total ranges for a service
 SELECT COUNT(*) 

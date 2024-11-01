@@ -77,53 +77,6 @@ func (h *grpcAdapter) GetRange(ctx context.Context, req *pb.GetRangeRequest) (*p
 	return searializedRange, nil
 }
 
-func (h *grpcAdapter) ListRanges(ctx context.Context, req *pb.ListRangesRequest) (*pb.ListRangesResponse, error) {
-	if req.ServiceId == "" {
-		return nil, status.Error(codes.InvalidArgument, "service_id is required")
-	}
-
-	params := service.ListRangesParams{
-		PageSize:  req.PageSize,
-		ServiceID: req.ServiceId,
-	}
-
-	if req.Status != nil {
-		rangeStatus, err := util.ConvertPBToDBRangeStatus(req.Status)
-		if err != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid RangeStatus value: %v", err)
-		}
-		params.Status = &rangeStatus
-	}
-
-	if req.Region != nil && *req.Region != "" {
-		params.Region = req.Region
-	}
-
-	if req.PageToken != "" {
-		params.PageToken = &req.PageToken
-	}
-
-	result, err := h.rangeAllocator.ListRanges(ctx, params)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list ranges: %v", err)
-	}
-
-	ranges := make([]*pb.Range, len(result.Ranges))
-	for i, r := range result.Ranges {
-		searializedRange, err := util.ConvertRangeToProto(r)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to allocate range: %v", err)
-		}
-		ranges[i] = searializedRange
-	}
-
-	return &pb.ListRangesResponse{
-		Ranges:        ranges,
-		NextPageToken: result.NextPageToken,
-		TotalCount:    int32(result.TotalCount),
-	}, nil
-}
-
 func (h *grpcAdapter) UpdateRangeStatus(ctx context.Context, req *pb.UpdateRangeStatusRequest) (*pb.Range, error) {
 	if req.RangeId == "" {
 		return nil, status.Error(codes.InvalidArgument, "range_id is required")

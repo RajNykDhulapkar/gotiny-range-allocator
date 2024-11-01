@@ -12,8 +12,6 @@ service RangeAllocator {
 
   rpc GetRange(GetRangeRequest) returns (Range) {}
 
-  rpc ListRanges(ListRangesRequest) returns (ListRangesResponse) {}
-
   rpc UpdateRangeStatus(UpdateRangeStatusRequest) returns (Range) {}
 
   rpc GetHealth(google.protobuf.Empty) returns (HealthResponse) {}
@@ -39,20 +37,6 @@ message AllocateRangeRequest {
 message AllocateRangeResponse { Range range = 1; }
 
 message GetRangeRequest { string range_id = 1; }
-
-message ListRangesRequest {
-  string service_id = 1;
-  optional RangeStatus status = 2;
-  optional string region = 3;
-  int32 page_size = 4;
-  string page_token = 5;
-}
-
-message ListRangesResponse {
-  repeated Range ranges = 1;
-  string next_page_token = 2;
-  int32 total_count = 3;
-}
 
 message UpdateRangeStatusRequest {
   string range_id = 1;
